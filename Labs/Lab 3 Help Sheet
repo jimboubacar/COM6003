@@ -1,0 +1,31 @@
+Lab 3: Clinical Records & Advanced Features
+
+CONTEXT
+This lab introduces the Electronic Health Record (EHR) component, which expands the system’s capabilities to manage clinical information. 
+You will develop patient summaries, enable recording of vital signs, and implement barcode-based patient identification. 
+This stage also introduces offline data management and accessibility enhancements.
+
+AIMS & OBJECTIVES
+	To design and implement an EHR system for storing and displaying patient data.
+	To enable barcode scanning for accurate and efficient patient identification.
+	To incorporate offline capabilities using background processing tools.
+	To enhance system performance and accessibility for all users.
+
+USER REQUIREMENTS
+Functional Requirements
+	The system must provide a patient summary interface displaying information such as conditions, allergies, and medications.
+	The system must allow healthcare professionals to record and submit patient vital signs.
+	The application must include barcode scanning functionality for patient matching via wristbands.
+	Offline queueing must be implemented to ensure that data collected without connectivity is synchronised once online.
+
+Non-Functional Requirements
+	The system must use pagination to maintain performance with large datasets.
+	Accessibility features, including TalkBack support, must be implemented for visually impaired users.
+	Offline synchronisation must be reliable, using background tasks for data transmission.
+	No Protected Health Information (PHI) should appear in system logs or notifications.
+
+DELIVERABLES
+	Operational clinical records management system.
+	Barcode scanning and patient matching capability.
+	Offline data handling through background synchronisation.
+	Accessibility enhancements to meet healthcare usability standards.
