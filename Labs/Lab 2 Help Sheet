@@ -1,0 +1,28 @@
+Lab 2: Appointments & Core Security
+
+CONTEXT
+Building on the foundation created in Lab 1, this stage focuses on developing appointment management functionality, implementing biometric authentication, and integrating secure API communication using Retrofit. Emphasis will be placed on enhancing system reliability and security.
+
+AIMS & OBJECTIVES
+To design and implement an appointment scheduling and booking system.
+To integrate biometric authentication for secure user access.
+To establish secure API communication using Retrofit.
+To enhance the security and performance of the overall application.
+
+USER REQUIREMENTS
+Functional Requirements
+The system must display a list of appointments for the current day, allowing filtering by clinic or location.
+Users must be able to book, reschedule, and manage appointments, with conflict detection implemented.
+The system must include biometric authentication with a secure fallback method for login.
+
+Non-Functional Requirements
+The appointment list must load within two seconds under normal network conditions.
+Biometric authentication must comply with Android security best practices.
+Role-Based Access Control (RBAC) must be applied for managing user permissions.
+The system must handle network interruptions gracefully to maintain reliability.
+
+DELIVERABLES
+A complete appointment management module.
+Functional biometric authentication flow.
+Retrofit integration with a mock or test API.
+Enhanced security and reliability features.
