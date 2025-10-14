@@ -1,5 +1,5 @@
 Help Sheet for lab 1
-Lab 1 Android project skeleton in Java using an Empty Views Activity. It includes:
+Lab 1 Android project skeleton in Java using an Empty Views Activity. Choose Java as programming language. It includes:
 •	Patient Registration (with NHS number validation, Room DB)
 •	An Admin Portal (staff registration + list)
 •	RBAC (only Admins can access the Admin Portal; first-run bootstrap allows you to create the first Admin)
