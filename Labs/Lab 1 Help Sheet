@@ -5,7 +5,9 @@ Lab 1 Android project skeleton in Java using an Empty Views Activity. Choose Jav
 •	RBAC (only Admins can access the Admin Portal; first-run bootstrap allows you to create the first Admin)
 •	Simple “current user” session via SharedPreferences
 Project/app name: HospiManagmenetApp (Please use the same name)
-Create a new Empty Views Activity project in Android Studio called HospiManagmenetApp, then replace/add files as below. Some of the files may require changing. Pay close attention to the imports as they give you information regarding this project skeleton’ s file structure.
+Create a new Empty Views Activity project in Android Studio called HospiManagmenetApp, then replace/add files as below. 
+Some of the files may require changing. 
+Pay close attention to the imports as they give you information regarding this project skeleton’ s file structure.
 settings.gradle (Project)
 pluginManagement { // Configure how Gradle locates plugins used in the build
     repositories { // Define the repositories that will host Gradle plugins
