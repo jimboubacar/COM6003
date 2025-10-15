@@ -8,7 +8,63 @@ Project/app name: HospiManagmenetApp (Please use the same name)
 Create a new Empty Views Activity project in Android Studio called HospiManagmenetApp, then replace/add files as below. 
 Some of the files may require changing. 
 Pay close attention to the imports as they give you information regarding this project skeleton’ s file structure.
-settings.gradle (Project)
+
+AndroidManifest.xml  file
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.hospimanagmenetapp">
+
+    <!-- Network access (harmless for Lab 1) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- LAB 2 ONLY: Biometric permission -->
+    <!-- <uses-permission android:name="android.permission.USE_BIOMETRIC" /> -->
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="HospiManagmenetApp"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar">
+
+        <!-- Launcher / entry point -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Lab 1 screens -->
+        <activity
+            android:name=".ui.PatientRegistrationActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.AdminLoginActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".ui.AdminPortalActivity"
+            android:exported="false"
+            android:parentActivityName=".ui.AdminLoginActivity" />
+
+        <!-- LAB 2 ONLY: Appointments host -->
+        <!--
+        <activity
+            android:name=".feature.appointments.ui.AppointmentActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+        -->
+    </application>
+</manifest>
+
+Settings.gradle.kts
 pluginManagement { // Configure how Gradle locates plugins used in the build
     repositories { // Define the repositories that will host Gradle plugins
         google { // Use Google's Maven repository for Android/Google plugins
@@ -30,10 +86,10 @@ dependencyResolutionManagement { // Control how project dependencies (not plugin
         mavenCentral() // Maven Central for the wider JVM ecosystem
     }
 }
-rootProject.name = "HospiManagmenetApp" // The name shown for the root project in Gradle/IDE 
+rootProject.name = "HospiManagmenetApp" // The name shown for the root project in Gradle/IDE
 include(":app") // Include the ':app' module in this multi-module build
 
-app/build.gradle (Module) (Note that Lab 2 dependencies are included. Change sdk in the context of your project)
+build.gradle.kts
 plugins { // Gradle plugins applied to this module
     alias(libs.plugins.android.application) // Use the Android Application plugin via the version catalogue alias
 }
@@ -41,7 +97,7 @@ android { // Android-specific build configuration for the app module
     namespace = "com.example.hospimanagmenetapp" // Package namespace used for R classes & manifest
     compileSdk = 36 // Compile against Android API level 36 (must match an installed SDK)
     defaultConfig { // Default settings for all build variants
-        applicationId = "com.example.hospimanagmenetapp" // Unique app ID used on devices/Play Store 
+        applicationId = "com.example.hospimanagmenetapp" // Unique app ID used on devices/Play Store
         minSdk = 24 // Minimum Android version the app supports (Android 7.0)
         targetSdk = 36 // Target behaviour for API level 36 (opt-in to latest platform changes)
         versionCode = 1 // Internal version (integer) used for updates
@@ -69,7 +125,7 @@ android { // Android-specific build configuration for the app module
     }
 }
 dependencies { // Libraries this module depends on
-    
+
     implementation(libs.appcompat) // AndroidX AppCompat for backwards-compatible UI components
     implementation(libs.material) // Material Components for Android
     implementation(libs.activity) // AndroidX Activity KTX utilities
@@ -98,170 +154,19 @@ dependencies { // Libraries this module depends on
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0") // Interceptor for request/response logging
 
     // --- Lab 2: Biometric authentication ---
-    implementation("androidx.biometric:biometric:1.2.0-alpha05") // BiometricPrompt APIs for fingerprint/face auth 
+    implementation("androidx.biometric:biometric:1.2.0-alpha05") // BiometricPrompt APIs for fingerprint/face auth
 
     // Tests (version catalogue)
     testImplementation(libs.junit) // JUnit 4 for local unit tests
     androidTestImplementation(libs.ext.junit) // AndroidX JUnit extensions for instrumented tests
     androidTestImplementation(libs.espresso.core) // Espresso UI testing framework
+
 }
 
-Manifest file (some features require commenting out as they are required only for Lab 2)
-<?xml version="1.0" encoding="utf-8"?>
-<manifest
-    xmlns:android="http://schemas.android.com/apk/res/android"  <!-- XML namespace for Android attributes -->
-    package="com.example.hospimanagmenetapp">                   <!-- App’s package name (also the default appId in manifests); -->
-
-    <!-- Allows all outbound network access for Retrofit/OkHttp -->
-    <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- Biometric permission (normal, auto-granted on API 28+). Not strictly required for BiometricPrompt, but harmless. -->
-    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-    <application
-        android:allowBackup="false"                                 <!-- Disables ADB/auto backup of app data; good for privacy -->
-        android:icon="@mipmap/ic_launcher"                          <!-- Launcher icon resource -->
-        android:label="HospiManagmenetApp"                          <!-- App name shown to users -->
-        android:roundIcon="@mipmap/ic_launcher_round"               <!-- Round icon for devices that use it -->
-        android:supportsRtl="true"                                  <!-- Enable right-to-left layout mirroring -->
-        android:theme="@style/Theme.HospiManagmenetApp"             <!-- Global app theme -->
-        android:networkSecurityConfig="@xml/network_security_config"> <!-- Custom network security (e.g., allow debug cleartext, custom CAs) -->
-
-        <!-- Launcher activity: entry point shown on the home screen -->
-        <activity
-            android:name=".MainActivity"                             <!-- Fully qualified class via relative package path -->
-            android:exported="true">                             <!-- Required true for activities with intent filters on API 31+ -->
-            <intent-filter>                                          <!-- Declares this activity as a launcher target -->
-                <action android:name="android.intent.action.MAIN" /> <!-- Main entry action -->
-                <category android:name="android.intent.category.LAUNCHER" /> <!-- Puts icon in the launcher -->
-            </intent-filter>
-        </activity>
-
-        <!-- Patient registration screen; no external entry (internal only) -->
-        <activity
-            android:name=".ui.PatientRegistrationActivity"
-            android:exported="false"                                 <!-- Not launchable by other apps -->
-            android:parentActivityName=".MainActivity" />            <!-- Enables Up navigation back to MainActivity -->
-
-        <!-- Admin login screen; internal only -->
-        <activity
-            android:name=".ui.AdminLoginActivity"
-            android:exported="false"
-            android:parentActivityName=".MainActivity" />
-
-        <!-- Admin portal; returns “Up” to AdminLogin by default -->
-        <activity
-            android:name=".ui.AdminPortalActivity"
-            android:exported="false"
-            android:parentActivityName=".ui.AdminLoginActivity" />
-        <!-- To return directly to Main instead, set parentActivityName=".MainActivity" -->
-
-        <!-- Appointments host; contains list/booking fragments; internal only -->
-        <activity
-            android:name=".ui.AppointmentActivity"
-            android:exported="false"
-            android:parentActivityName=".MainActivity" />
-    </application>
-
-</manifest>
 
 Theme (created by Android Studio)
+
 Layouts (XML)
-activity_main.xml
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"  <!-- XML namespace for Android view attributes -->
-    android:orientation="vertical"                                         <!-- Stack children top-to-bottom -->
-    android:padding="24dp"                                                 <!-- Inner spacing around the layout edges -->
-    android:layout_width="match_parent"                                    <!-- Fill the available width -->
-    android:layout_height="match_parent">                                  <!-- Fill the available height -->
-
-    <TextView
-        android:id="@+id/tvWelcome"                                        <!-- View ID for code/view binding -->
-        android:text="Welcome"                                             <!-- Text displayed to the user -->
-        android:textStyle="bold"                                           <!-- Bold styling -->
-        android:textSize="18sp"                                            <!-- Font size in sp (scales with user preference) -->
-        android:layout_width="wrap_content"                                <!-- Size to fit the text -->
-        android:layout_height="wrap_content"/>                              <!-- Size to fit the text -->
-
-    <Button
-        android:id="@+id/btnPatientRegistration"                           <!-- ID to reference this button -->
-        android:text="Patient Registration"                                <!-- Label shown on the button -->
-        android:layout_marginTop="24dp"                                    <!-- Space above this button -->
-        android:layout_width="match_parent"                                <!-- Make the button full-width -->
-        android:layout_height="wrap_content"/>                              <!-- Height adjusts to content -->
-
-    <Button
-        android:id="@+id/btnAdminPortal"
-        android:text="Admin Portal"
-        android:layout_marginTop="12dp"                                    <!-- Slightly smaller gap than first button -->
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
-
-    <Button
-        android:id="@+id/btnLogout"
-        android:text="Clear Session"                                       <!-- Clearer action label than “Logout” for demos -->
-        android:layout_marginTop="12dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
-</LinearLayout>
-
-activity_patient_registration.xml (You can add as many fields as you wish here)
-<?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"  <!-- Allows the form to scroll on smaller screens -->
-    android:fillViewport="true"                                          <!-- Let content expand to full height before scrolling -->
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
-
-    <LinearLayout
-        android:orientation="vertical"                                   <!-- Stack fields top-to-bottom -->
-        android:padding="24dp"                                           <!-- Comfortable form padding -->
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <EditText
-            android:id="@+id/etNhs"                                      <!-- NHS number input -->
-            android:hint="NHS Number (10 digits)"                        <!-- Placeholder text shown when empty -->
-            android:inputType="number"                                   <!-- Numeric keyboard (digits only) -->
-            android:maxLength="14"                                       <!-- Room for optional spaces; pure 10 digits still fits -->
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
-
-        <EditText
-            android:id="@+id/etFullName"                                 <!-- Patient full name -->
-            android:hint="Full Name"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
-
-        <EditText
-            android:id="@+id/etDob"                                      <!-- Date of birth -->
-            android:hint="Date of Birth (yyyy-MM-dd)"                    <!-- Desired format hint -->
-            android:inputType="date"                                     <!-- Date-friendly keyboard; consider a DatePicker -->
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
-
-        <EditText
-            android:id="@+id/etPhone"                                    <!-- Phone number -->
-            android:hint="Phone"
-            android:inputType="phone"                                    <!-- Phone keypad (includes + and # etc.) -->
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
-
-        <EditText
-            android:id="@+id/etEmail"                                    <!-- Email address -->
-            android:hint="Email"
-            android:inputType="textEmailAddress"                         <!-- Email-optimised keyboard and validation hints -->
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
-
-        <Button
-            android:id="@+id/btnSavePatient"                             <!-- Submit/save action -->
-            android:text="Save Patient"
-            android:layout_marginTop="16dp"                              <!-- Space above the button -->
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"/>
-    </LinearLayout>
-</ScrollView>
-
-activity_admin_login.xml
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
@@ -270,116 +175,200 @@ activity_admin_login.xml
     android:layout_height="match_parent">
 
     <TextView
-        android:text="Admin Login"
+        android:id="@+id/tvWelcome"
+        android:text="Welcome"
         android:textStyle="bold"
         android:textSize="18sp"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
-
-    <EditText
-        android:id="@+id/etAdminEmail"
-        android:hint="Admin Email"
-        android:inputType="textEmailAddress"
-        android:layout_marginTop="16dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
-
-    <EditText
-        android:id="@+id/etAdminPin"
-        android:hint="Admin PIN"
-        android:inputType="numberPassword"
-        android:layout_marginTop="8dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content" />
 
     <Button
-        android:id="@+id/btnAdminLogin"
-        android:text="Login"
-        android:layout_marginTop="16dp"
+        android:id="@+id/btnPatientRegistration"
+        android:text="Patient Registration"
+        android:layout_marginTop="24dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content" />
 
     <Button
-        android:id="@+id/btnOpenAdminSetup"
-        android:text="Open Admin Portal (Setup Mode)"
-        android:layout_marginTop="8dp"
+        android:id="@+id/btnAdminPortal"
+        android:text="Admin Portal"
+        android:layout_marginTop="12dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:enabled="false"/>
+        android:layout_height="wrap_content" />
+
+    <Button
+        android:id="@+id/btnLogout"
+        android:text="Clear Session"
+        android:layout_marginTop="12dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
 </LinearLayout>
+
+
+activity_patient_registration.xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <!-- existing fields -->
+            <EditText android:id="@+id/etNhs" android:hint="NHS Number (10 digits)"
+                android:inputType="number" android:maxLength="14"
+                android:layout_width="match_parent" android:layout_height="wrap_content"/>
+
+            <EditText android:id="@+id/etFullName" android:hint="Full Name"
+                android:layout_width="match_parent" android:layout_height="wrap_content"/>
+
+            <EditText android:id="@+id/etDob" android:hint="Date of Birth (yyyy-MM-dd)"
+                android:inputType="date"
+                android:layout_width="match_parent" android:layout_height="wrap_content"/>
+
+            <EditText android:id="@+id/etPhone" android:hint="Phone" android:inputType="phone"
+                android:layout_width="match_parent" android:layout_height="wrap_content"/>
+
+            <EditText android:id="@+id/etEmail" android:hint="Email" android:inputType="textEmailAddress"
+                android:layout_width="match_parent" android:layout_height="wrap_content"/>
+
+            <Button android:id="@+id/btnSavePatient" android:text="Save Patient"
+                android:layout_marginTop="16dp"
+                android:layout_width="match_parent" android:layout_height="wrap_content"/>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
+
+
+activity_admin_login.xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="0dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Top app bar for the Up (back) button -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize" />
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:text="Staff Login"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <EditText
+            android:id="@+id/etAdminEmail"
+            android:hint="Staff Email"
+            android:inputType="textEmailAddress"
+            android:layout_marginTop="16dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <EditText
+            android:id="@+id/etAdminPin"
+            android:hint="Admin PIN (Admins only)"
+            android:inputType="numberPassword"
+            android:layout_marginTop="8dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btnAdminLogin"
+            android:text="Login"
+            android:layout_marginTop="16dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/btnOpenAdminSetup"
+            android:text="Open Admin Portal (Setup Mode)"
+            android:enabled="false"
+            android:layout_marginTop="8dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+</LinearLayout>
+
 
 activity_admin_portal.xml
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
-    android:padding="16dp"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <TextView
-        android:text="Admin Portal — Staff Registration (RBAC)"
-        android:textStyle="bold"
-        android:textSize="18sp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
-
-    <EditText
-        android:id="@+id/etStaffName"
-        android:hint="Full Name"
-        android:layout_marginTop="12dp"
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="?attr/actionBarSize" />
 
-    <EditText
-        android:id="@+id/etStaffEmail"
-        android:hint="Email"
-        android:inputType="textEmailAddress"
+    <LinearLayout
+        android:orientation="vertical"
+        android:padding="16dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="match_parent">
 
-    <Spinner
-        android:id="@+id/spRole"
-        android:layout_marginTop="8dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        <TextView
+            android:text="Admin Portal — Staff Registration"
+            android:textStyle="bold"
+            android:textSize="18sp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
 
-    <EditText
-        android:id="@+id/etAdminSetupPin"
-        android:hint="Admin PIN (required if role = ADMIN)"
-        android:inputType="numberPassword"
-        android:layout_marginTop="8dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        <!-- keep your existing fields and RecyclerView below unchanged -->
+        <!-- … -->
+        <EditText android:id="@+id/etStaffName" android:hint="Full Name"
+            android:layout_marginTop="12dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+        <EditText android:id="@+id/etStaffEmail" android:hint="Email" android:inputType="textEmailAddress"
+            android:layout_width="match_parent" android:layout_height="wrap_content"/>
+        <Spinner android:id="@+id/spRole"
+            android:layout_marginTop="8dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+        <EditText android:id="@+id/etAdminSetupPin" android:hint="Admin PIN (required if role = ADMIN)"
+            android:inputType="numberPassword" android:layout_marginTop="8dp"
+            android:layout_width="match_parent" android:layout_height="wrap_content"/>
+        <Button android:id="@+id/btnRegisterStaff" android:text="Register Staff"
+            android:layout_marginTop="12dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+        <Button android:id="@+id/btnRefreshList" android:text="Refresh List"
+            android:layout_marginTop="8dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
 
-    <Button
-        android:id="@+id/btnRegisterStaff"
-        android:text="Register Staff"
-        android:layout_marginTop="12dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        <TextView android:text="Registered Staff" android:textStyle="bold"
+            android:layout_marginTop="16dp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
 
-    <Button
-        android:id="@+id/btnRefreshList"
-        android:text="Refresh List"
-        android:layout_marginTop="8dp"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
-
-    <TextView
-        android:text="Registered Staff"
-        android:textStyle="bold"
-        android:layout_marginTop="16dp"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvStaff"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:layout_weight="1"/>
-
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvStaff"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"/>
+    </LinearLayout>
 </LinearLayout>
+
 
 item_staff.xml
 <?xml version="1.0" encoding="utf-8"?>
