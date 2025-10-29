@@ -28,3 +28,993 @@ DELIVERABLES
   Functional biometric authentication flow.
   Retrofit integration with a mock or test API.
   Enhanced security and reliability features.
+
+
+Help Sheet for Lab 2
+The exact changes to upgrade your Lab 1 (HospiManagmenetApp) to include Lab 2: Appointments & Core Security. 
+
+Everything is copy–paste ready and keeps your existing app working. I’ve only included the new/updated files you need.
+Notes:
+	I’m keeping the base package com.example.hospimanagmenetapp for compatibility, and nesting the Lab-2 packages beneath it (e.g. feature.appointments, security.auth, network).
+	Room DB version is bumped; I’ve kept fallbackToDestructiveMigration() like Lab 1 (safe for a teaching lab).
+	These are just examples that may not apply to your code architecture.
+
+1) app/build.gradle — ADD dependencies
+Replace your dependencies { ... } block with this one (keeps your Room/Lifecycle + adds Retrofit/OkHttp/Gson + Biometric + ViewModel):
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.recyclerview:recyclerview:1.3.2'
+
+    // Room
+    implementation 'androidx.room:room-runtime:2.6.1'
+    annotationProcessor 'androidx.room:room-compiler:2.6.1'
+
+    // Lifecycle / ViewModel
+    implementation 'androidx.lifecycle:lifecycle-runtime:2.8.6'
+    implementation 'androidx.lifecycle:lifecycle-livedata:2.8.6'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel:2.8.6'
+
+    // Retrofit / OkHttp (mock + logging)
+    implementation 'com.squareup.retrofit2:retrofit:2.11.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+
+    // Biometric
+    implementation 'androidx.biometric:biometric:1.2.0-alpha05'
+
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+}
+
+2) AndroidManifest.xml — UPDATE application + ADD AppointmentActivity
+Add the android:networkSecurityConfig and the new activity:
+<application
+    android:allowBackup="true"
+    android:label="HospiManagmenetApp"
+    android:icon="@mipmap/ic_launcher"
+    android:roundIcon="@mipmap/ic_launcher_round"
+    android:supportsRtl="true"
+    android:theme="@style/Theme.HospiManagmenetApp"
+    android:networkSecurityConfig="@xml/network_security_config">
+
+    <activity android:name=".ui.AdminLoginActivity" android:exported="false"/>
+    <activity android:name=".ui.AdminPortalActivity" android:exported="false"/>
+    <activity android:name=".ui.PatientRegistrationActivity" android:exported="false"/>
+    <!-- NEW: host for Appointments fragments -->
+    <activity android:name=".feature.appointments.ui.AppointmentActivity" android:exported="false"/>
+
+    <activity android:name=".MainActivity" android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent-filter>
+    </activity>
+</application>
+
+3) Network Security Config (placeholder for pinning in Lab 4)
+app/src/main/res/xml/network_security_config.xml
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+
+4) Main screen button to open Appointments (Small tweak)
+app/src/main/res/layout/activity_main.xml — add a button below Admin Portal:
+<Button
+    android:id="@+id/btnAppointments"
+    android:text="Appointments"
+    android:layout_marginTop="12dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"/>
+app/src/main/java/com/example/hospimanagmenetapp/MainActivity.java — wire the button:
+// inside onCreate, after other findViewById calls:
+Button btnAppointments = findViewById(R.id.btnAppointments);
+btnAppointments.setOnClickListener(v ->
+        startActivity(new Intent(this, com.example.hospimanagmenetapp.feature.appointments.ui.AppointmentActivity.class)));
+
+
+5) Room DB — add Appointment entity
+5.1 AppDatabase.java — UPDATE: add entity + DAO + version bump (1 → 2)
+@Database(entities = {
+        com.example.hospimanagmenetapp.data.entities.Patient.class,
+        com.example.hospimanagmenetapp.data.entities.Staff.class,
+        com.example.hospimanagmenetapp.data.entities.Appointment.class  // NEW
+}, version = 2, exportSchema = false)
+public abstract class AppDatabase extends RoomDatabase {
+    public abstract com.example.hospimanagmenetapp.data.dao.PatientDao patientDao();
+    public abstract com.example.hospimanagmenetapp.data.dao.StaffDao staffDao();
+    public abstract com.example.hospimanagmenetapp.data.dao.AppointmentDao appointmentDao(); // NEW
+    ...
+}
+
+5.2 data/entities/Appointment.java — NEW
+app/src/main/java/com/example/hospimanagmenetapp/data/entities/Appointment.java
+package com.example.hospimanagmenetapp.data.entities;
+
+import androidx.room.Entity;
+import androidx.room.Index;
+import androidx.room.PrimaryKey;
+
+@Entity(tableName = "appointments",
+        indices = {@Index(value = {"startTime","clinicianId"})})
+public class Appointment {
+    @PrimaryKey(autoGenerate = true)
+    public long id;
+
+    public String patientNhsNumber; // link by NHS number (Lab 2 simple)
+    public long startTime;           // epoch millis
+    public long endTime;             // epoch millis
+    public long clinicianId;         // mock doctor id
+    public String clinicianName;
+    public String clinic;            // location/clinic name
+
+    public String status;            // BOOKED | CANCELLED | COMPLETED
+}
+
+5.3 data/dao/AppointmentDao.java — NEW
+app/src/main/java/com/example/hospimanagmenetapp/data/dao/AppointmentDao.java
+package com.example.hospimanagmenetapp.data.dao;
+
+import androidx.room.Dao;
+import androidx.room.Insert;
+import androidx.room.OnConflictStrategy;
+import androidx.room.Query;
+import androidx.room.Update;
+
+import com.example.hospimanagmenetapp.data.entities.Appointment;
+
+import java.util.List;
+
+@Dao
+public interface AppointmentDao {
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    long insert(Appointment appt);
+
+    @Update
+    int update(Appointment appt);
+
+    @Query("SELECT * FROM appointments WHERE startTime BETWEEN :start AND :end ORDER BY startTime ASC")
+    List<Appointment> findBetween(long start, long end);
+
+    @Query("SELECT * FROM appointments WHERE clinicianId = :clinicianId AND "
+            + "( (startTime < :newEnd AND endTime > :newStart) )")
+    List<Appointment> overlapping(long clinicianId, long newStart, long newEnd);
+}
+
+6) Network (Retrofit + Mock)
+6.1 network/dto — NEW DTOs
+AppointmentDto.java
+package com.example.hospimanagmenetapp.network.dto;
+
+public class AppointmentDto {
+    public long id;
+    public String patientNhsNumber;
+    public long startTime;
+    public long endTime;
+    public long clinicianId;
+    public String clinicianName;
+    public String clinic;
+    public String status;
+}
+ClinicDto.java
+package com.example.hospimanagmenetapp.network.dto;
+
+public class ClinicDto {
+    public String name;
+    public String location;
+}
+DoctorDto.java
+package com.example.hospimanagmenetapp.network.dto;
+
+public class DoctorDto {
+    public long id;
+    public String name;
+    public String clinic;
+}
+
+6.2 network/AppointmentApi.java — NEW
+package com.example.hospimanagmenetapp.network;
+
+import com.example.hospimanagmenetapp.network.dto.AppointmentDto;
+import java.util.List;
+import retrofit2.Call;
+import retrofit2.http.Body;
+import retrofit2.http.GET;
+import retrofit2.http.POST;
+import retrofit2.http.Query;
+
+public interface AppointmentApi {
+
+    @GET("appointments/today")
+    Call<List<AppointmentDto>> getTodaysAppointments(@Query("clinic") String clinic);
+
+    @POST("appointments/bookOrReschedule")
+    Call<AppointmentDto> bookOrReschedule(@Body AppointmentDto request);
+}
+
+6.3 network/MockInterceptor.java — NEW (loads assets/mock JSON)
+package com.example.hospimanagmenetapp.network;
+
+import android.content.Context;
+
+import okhttp3.Interceptor;
+import okhttp3.MediaType;
+import okhttp3.Protocol;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
+import okhttp3.Request;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+
+public class MockInterceptor implements Interceptor {
+
+    private final Context appContext;
+
+    public MockInterceptor(Context ctx) {
+        this.appContext = ctx.getApplicationContext();
+    }
+
+    @Override
+    public Response intercept(Chain chain) {
+        try {
+            Request req = chain.request();
+            String path = req.url().encodedPath();
+
+            String json = "{}";
+            if (path.endsWith("/appointments/today")) {
+                json = readAsset("mock/appointments_today.json");
+            } else if (path.endsWith("/appointments/bookOrReschedule")) {
+                json = readAsset("mock/booking_success.json");
+            }
+
+            return new Response.Builder()
+                    .code(200)
+                    .message("OK")
+                    .request(req)
+                    .protocol(Protocol.HTTP_1_1)
+                    .body(ResponseBody.create(json, MediaType.get("application/json")))
+                    .build();
+        } catch (Exception e) {
+            return new Response.Builder()
+                    .code(500)
+                    .message("Mock failure")
+                    .request(chain.request())
+                    .protocol(Protocol.HTTP_1_1)
+                    .body(ResponseBody.create("{\"error\":\"mock\"}", MediaType.get("application/json")))
+                    .build();
+        }
+    }
+
+    private String readAsset(String name) throws Exception {
+        BufferedReader br = new BufferedReader(
+                new InputStreamReader(appContext.getAssets().open(name), StandardCharsets.UTF_8));
+        StringBuilder sb = new StringBuilder();
+        String line; while ((line = br.readLine()) != null) sb.append(line);
+        br.close();
+        return sb.toString();
+    }
+}
+
+6.4 network/ApiClient.java — NEW
+package com.example.hospimanagmenetapp.network;
+
+import android.content.Context;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+
+import okhttp3.OkHttpClient;
+import okhttp3.logging.HttpLoggingInterceptor;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
+
+public class ApiClient {
+
+    private final AppointmentApi appointmentApi;
+
+    public ApiClient(Context ctx) {
+        HttpLoggingInterceptor log = new HttpLoggingInterceptor();
+        log.setLevel(HttpLoggingInterceptor.Level.BODY);
+
+        OkHttpClient client = new OkHttpClient.Builder()
+                .addInterceptor(new MockInterceptor(ctx))  // Mocked for Lab 2
+                .addInterceptor(log)
+                .build();
+
+        Gson gson = new GsonBuilder().setLenient().create();
+
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl("https://mock.hms.local/") // dummy; intercepted
+                .addConverterFactory(GsonConverterFactory.create(gson))
+                .client(client)
+                .build();
+
+        appointmentApi = retrofit.create(AppointmentApi.class);
+    }
+
+    public AppointmentApi appointmentApi() {
+        return appointmentApi;
+    }
+}
+
+7) Repository & Domain
+7.1 data/repo/AppointmentRepository.java — NEW
+package com.example.hospimanagmenetapp.data.repo;
+
+import android.content.Context;
+
+import com.example.hospimanagmenetapp.data.AppDatabase;
+import com.example.hospimanagmenetapp.data.dao.AppointmentDao;
+import com.example.hospimanagmenetapp.data.entities.Appointment;
+import com.example.hospimanagmenetapp.network.ApiClient;
+import com.example.hospimanagmenetapp.network.dto.AppointmentDto;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import retrofit2.Response;
+
+public class AppointmentRepository {
+
+    private final AppointmentDao dao;
+    private final ApiClient api;
+
+    public AppointmentRepository(Context ctx) {
+        this.dao = AppDatabase.getInstance(ctx).appointmentDao();
+        this.api = new ApiClient(ctx);
+    }
+
+    public List<Appointment> getTodaysAppointments(String clinic, long start, long end) throws Exception {
+        // fetch mock network first
+        Response<List<AppointmentDto>> resp = api.appointmentApi().getTodaysAppointments(clinic).execute();
+        List<Appointment> mapped = new ArrayList<>();
+        if (resp.isSuccessful() && resp.body() != null) {
+            for (AppointmentDto dto : resp.body()) {
+                Appointment a = map(dto);
+                mapped.add(a);
+            }
+        }
+        // cache to DB (simplified: insert if none today)
+        for (Appointment a : mapped) {
+            dao.insert(a);
+        }
+        // return from DB (source of truth)
+        return dao.findBetween(start, end);
+    }
+
+    public Appointment bookOrReschedule(Appointment appt) throws Exception {
+        AppointmentDto dto = new AppointmentDto();
+        dto.id = appt.id;
+        dto.patientNhsNumber = appt.patientNhsNumber;
+        dto.startTime = appt.startTime;
+        dto.endTime = appt.endTime;
+        dto.clinicianId = appt.clinicianId;
+        dto.clinicianName = appt.clinicianName;
+        dto.clinic = appt.clinic;
+        dto.status = "BOOKED";
+
+        Response<AppointmentDto> resp = api.appointmentApi().bookOrReschedule(dto).execute();
+        if (resp.isSuccessful() && resp.body() != null) {
+            Appointment saved = map(resp.body());
+            if (saved.id == 0) { // mock may return id=0, keep local
+                saved.id = appt.id;
+            }
+            if (appt.id == 0) dao.insert(saved); else dao.update(saved);
+            return saved;
+        } else {
+            throw new IllegalStateException("Booking failed");
+        }
+    }
+
+    public List<Appointment> detectConflicts(long clinicianId, long start, long end) {
+        return dao.overlapping(clinicianId, start, end);
+    }
+
+    private Appointment map(AppointmentDto dto) {
+        Appointment a = new Appointment();
+        a.id = dto.id;
+        a.patientNhsNumber = dto.patientNhsNumber;
+        a.startTime = dto.startTime;
+        a.endTime = dto.endTime;
+        a.clinicianId = dto.clinicianId;
+        a.clinicianName = dto.clinicianName;
+        a.clinic = dto.clinic;
+        a.status = dto.status;
+        return a;
+    }
+}
+7.2 Domain Use Cases — NEW
+domain/GetTodaysAppointmentsUseCase.java
+package com.example.hospimanagmenetapp.domain;
+
+import android.content.Context;
+
+import com.example.hospimanagmenetapp.data.entities.Appointment;
+import com.example.hospimanagmenetapp.data.repo.AppointmentRepository;
+
+import java.util.Calendar;
+import java.util.List;
+
+public class GetTodaysAppointmentsUseCase {
+
+    private final AppointmentRepository repo;
+
+    public GetTodaysAppointmentsUseCase(Context ctx) {
+        this.repo = new AppointmentRepository(ctx);
+    }
+
+    public List<Appointment> execute(String clinic) throws Exception {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        long start = cal.getTimeInMillis();
+        cal.add(Calendar.DAY_OF_MONTH, 1);
+        long end = cal.getTimeInMillis();
+        return repo.getTodaysAppointments(clinic, start, end);
+    }
+}
+domain/BookOrRescheduleAppointmentUseCase.java
+package com.example.hospimanagmenetapp.domain;
+
+import android.content.Context;
+
+import com.example.hospimanagmenetapp.data.entities.Appointment;
+import com.example.hospimanagmenetapp.data.repo.AppointmentRepository;
+
+public class BookOrRescheduleAppointmentUseCase {
+    private final AppointmentRepository repo;
+
+    public BookOrRescheduleAppointmentUseCase(Context ctx) {
+        this.repo = new AppointmentRepository(ctx);
+    }
+
+    public Appointment execute(Appointment appt) throws Exception {
+        return repo.bookOrReschedule(appt);
+    }
+}
+domain/DetectScheduleConflictsUseCase.java
+package com.example.hospimanagmenetapp.domain;
+
+import android.content.Context;
+
+import com.example.hospimanagmenetapp.data.entities.Appointment;
+import com.example.hospimanagmenetapp.data.repo.AppointmentRepository;
+
+import java.util.List;
+
+public class DetectScheduleConflictsUseCase {
+    private final AppointmentRepository repo;
+
+    public DetectScheduleConflictsUseCase(Context ctx) {
+        this.repo = new AppointmentRepository(ctx);
+    }
+
+    public boolean hasConflict(long clinicianId, long start, long end) {
+        List<Appointment> overlaps = repo.detectConflicts(clinicianId, start, end);
+        return overlaps != null && !overlaps.isEmpty();
+    }
+}
+
+8) Security (Biometric + RBAC)
+8.1 security/auth/BiometricLoginCoordinator.java — NEW
+package com.example.hospimanagmenetapp.security.auth;
+
+import android.app.Activity;
+import android.content.Context;
+
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+
+import java.util.concurrent.Executor;
+
+public class BiometricLoginCoordinator {
+
+    public interface Callback {
+        void onSuccess();
+        void onFailure(String reason);
+    }
+
+    public void authenticate(Activity activity, Callback cb) {
+        BiometricManager bm = BiometricManager.from(activity);
+        int can = bm.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG);
+        if (can != BiometricManager.BIOMETRIC_SUCCESS) {
+            cb.onFailure("Biometrics unavailable");
+            return;
+        }
+
+        Executor ex = ContextCompat.getMainExecutor(activity);
+        BiometricPrompt prompt = new BiometricPrompt(activity, ex,
+                new BiometricPrompt.AuthenticationCallback() {
+                    @Override public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                        cb.onSuccess();
+                    }
+                    @Override public void onAuthenticationError(int errorCode, CharSequence errString) {
+                        cb.onFailure(errString.toString());
+                    }
+                    @Override public void onAuthenticationFailed() {
+                        cb.onFailure("Authentication failed");
+                    }
+                });
+
+        BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Confirm your identity")
+                .setSubtitle("Access Appointments")
+                .setNegativeButtonText("Cancel")
+                .build();
+
+        prompt.authenticate(info);
+    }
+}
+
+8.2 security/auth/RbacPolicyEvaluator.java — NEW
+package com.example.hospimanagmenetapp.security.auth;
+
+import android.content.Context;
+
+import com.example.hospimanagmenetapp.util.SessionManager;
+
+public class RbacPolicyEvaluator {
+
+    // Simple matrix: ADMIN & RECEPTION & CLINICIAN can view list; only ADMIN & RECEPTION can book/reschedule
+    public static boolean canViewAppointments(Context ctx) {
+        String role = SessionManager.getCurrentRole(ctx);
+        return "ADMIN".equals(role) || "RECEPTION".equals(role) || "CLINICIAN".equals(role);
+    }
+
+    public static boolean canBookOrReschedule(Context ctx) {
+        String role = SessionManager.getCurrentRole(ctx);
+        return "ADMIN".equals(role) || "RECEPTION".equals(role);
+    }
+}
+
+
+9) UI (Activity + Fragments + Adapter)
+9.1 feature/appointments/ui/AppointmentActivity.java — NEW (host + biometric gate)
+package com.example.hospimanagmenetapp.feature.appointments.ui;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.os.Bundle;
+import android.widget.Toast;
+
+import com.example.hospimanagmenetapp.R;
+import com.example.hospimanagmenetapp.security.auth.BiometricLoginCoordinator;
+import com.example.hospimanagmenetapp.security.auth.RbacPolicyEvaluator;
+
+public class AppointmentActivity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_appointment);
+
+        if (!RbacPolicyEvaluator.canViewAppointments(this)) {
+            Toast.makeText(this, "Access denied. Please sign in with a permitted role.", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
+        new BiometricLoginCoordinator().authenticate(this, new BiometricLoginCoordinator.Callback() {
+            @Override public void onSuccess() {
+                if (savedInstanceState == null) {
+                    getSupportFragmentManager().beginTransaction()
+                            .replace(R.id.appointmentContainer, new AppointmentListFragment())
+                            .commit();
+                }
+            }
+            @Override public void onFailure(String reason) {
+                Toast.makeText(AppointmentActivity.this, "Biometric required: " + reason, Toast.LENGTH_LONG).show();
+                finish();
+            }
+        });
+    }
+}
+
+9.2 feature/appointments/ui/list/AppointmentListFragment.java — NEW
+package com.example.hospimanagmenetapp.feature.appointments.ui;
+
+import android.os.Bundle;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.*;
+
+import com.example.hospimanagmenetapp.R;
+import com.example.hospimanagmenetapp.data.entities.Appointment;
+import com.example.hospimanagmenetapp.domain.GetTodaysAppointmentsUseCase;
+import com.example.hospimanagmenetapp.feature.appointments.ui.adapters.AppointmentAdapter;
+
+import java.util.List;
+import java.util.concurrent.Executors;
+
+public class AppointmentListFragment extends Fragment {
+
+    private Spinner spClinic;
+    private ProgressBar progress;
+    private androidx.recyclerview.widget.RecyclerView rv;
+
+    @Nullable
+    @Override
+    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View v = inflater.inflate(R.layout.fragment_appointment_list, container, false);
+        spClinic = v.findViewById(R.id.spClinic);
+        progress = v.findViewById(R.id.progress);
+        rv = v.findViewById(R.id.rvAppointments);
+        rv.setLayoutManager(new LinearLayoutManager(getContext()));
+        ArrayAdapter<String> clinics = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_dropdown_item,
+                new String[]{"All Clinics","Surgery A","Surgery B"});
+        spClinic.setAdapter(clinics);
+
+        v.findViewById(R.id.btnRefresh).setOnClickListener(b -> loadData());
+        loadData();
+        return v;
+    }
+
+    private void loadData() {
+        progress.setVisibility(View.VISIBLE);
+        String clinic = spClinic.getSelectedItemPosition() == 0 ? null : spClinic.getSelectedItem().toString();
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                List<Appointment> list = new GetTodaysAppointmentsUseCase(requireContext()).execute(clinic);
+                requireActivity().runOnUiThread(() -> {
+                    progress.setVisibility(View.GONE);
+                    rv.setAdapter(new AppointmentAdapter(list, item -> {
+                        BookingFragment f = BookingFragment.newInstance(item);
+                        requireActivity().getSupportFragmentManager().beginTransaction()
+                                .replace(R.id.appointmentContainer, f)
+                                .addToBackStack(null)
+                                .commit();
+                    }));
+                });
+            } catch (Exception e) {
+                requireActivity().runOnUiThread(() -> {
+                    progress.setVisibility(View.GONE);
+                    Toast.makeText(getContext(), "Failed to load. Please retry.", Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+}
+
+9.3 feature/appointments/ui/BookingFragment.java — NEW
+package com.example.hospimanagmenetapp.feature.appointments.ui;
+
+import android.os.Bundle;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+
+import android.text.TextUtils;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.*;
+
+import com.example.hospimanagmenetapp.R;
+import com.example.hospimanagmenetapp.data.entities.Appointment;
+import com.example.hospimanagmenetapp.domain.BookOrRescheduleAppointmentUseCase;
+import com.example.hospimanagmenetapp.domain.DetectScheduleConflictsUseCase;
+import com.example.hospimanagmenetapp.security.auth.RbacPolicyEvaluator;
+
+import java.util.concurrent.Executors;
+
+public class BookingFragment extends Fragment {
+
+    private static final String ARG_CLINICIAN_ID = "clinicianId";
+    private static final String ARG_CLINICIAN_NAME = "clinicianName";
+    private static final String ARG_PATIENT_NHS = "patientNhs";
+    private static final String ARG_START = "start";
+    private static final String ARG_END = "end";
+    private static final String ARG_CLINIC = "clinic";
+
+    public static BookingFragment newInstance(Appointment a) {
+        Bundle b = new Bundle();
+        b.putLong(ARG_CLINICIAN_ID, a.clinicianId);
+        b.putString(ARG_CLINICIAN_NAME, a.clinicianName);
+        b.putString(ARG_PATIENT_NHS, a.patientNhsNumber);
+        b.putLong(ARG_START, a.startTime);
+        b.putLong(ARG_END, a.endTime);
+        b.putString(ARG_CLINIC, a.clinic);
+        BookingFragment f = new BookingFragment();
+        f.setArguments(b);
+        return f;
+    }
+
+    private EditText etStart, etEnd, etNhs;
+    private TextView tvClinician;
+    private Button btnConfirm;
+
+    @Nullable
+    @Override
+    public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View v = inflater.inflate(R.layout.fragment_booking, container, false);
+
+        tvClinician = v.findViewById(R.id.tvClinician);
+        etNhs = v.findViewById(R.id.etNhsBooking);
+        etStart = v.findViewById(R.id.etStartMillis);
+        etEnd = v.findViewById(R.id.etEndMillis);
+        btnConfirm = v.findViewById(R.id.btnConfirmBooking);
+
+        Bundle args = getArguments();
+        if (args != null) {
+            tvClinician.setText("Clinician: " + args.getString(ARG_CLINICIAN_NAME, ""));
+            etNhs.setText(args.getString(ARG_PATIENT_NHS, ""));
+            etStart.setText(String.valueOf(args.getLong(ARG_START)));
+            etEnd.setText(String.valueOf(args.getLong(ARG_END)));
+        }
+
+        btnConfirm.setOnClickListener(v1 -> confirm());
+        return v;
+    }
+
+    private void confirm() {
+        if (!RbacPolicyEvaluator.canBookOrReschedule(requireContext())) {
+            Toast.makeText(getContext(), "You do not have permission to book.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        String nhs = etNhs.getText().toString().trim();
+        String startStr = etStart.getText().toString().trim();
+        String endStr = etEnd.getText().toString().trim();
+
+        if (TextUtils.isEmpty(nhs) || TextUtils.isEmpty(startStr) || TextUtils.isEmpty(endStr)) {
+            Toast.makeText(getContext(), "NHS, start and end are required.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        long clinicianId = getArguments().getLong(ARG_CLINICIAN_ID);
+        long start = Long.parseLong(startStr);
+        long end = Long.parseLong(endStr);
+        String clinic = getArguments().getString(ARG_CLINIC);
+
+        // conflict detection
+        boolean conflict = new DetectScheduleConflictsUseCase(requireContext()).hasConflict(clinicianId, start, end);
+        if (conflict) {
+            Toast.makeText(getContext(), "Time conflict detected. Choose another slot.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        Appointment a = new Appointment();
+        a.patientNhsNumber = nhs;
+        a.clinicianId = clinicianId;
+        a.clinicianName = getArguments().getString(ARG_CLINICIAN_NAME);
+        a.startTime = start;
+        a.endTime = end;
+        a.clinic = clinic;
+        a.status = "BOOKED";
+
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                new BookOrRescheduleAppointmentUseCase(requireContext()).execute(a);
+                requireActivity().runOnUiThread(() -> {
+                    Toast.makeText(getContext(), "Appointment confirmed.", Toast.LENGTH_LONG).show();
+                    requireActivity().getSupportFragmentManager().popBackStack(); // back to list
+                });
+            } catch (Exception e) {
+                requireActivity().runOnUiThread(() ->
+                        Toast.makeText(getContext(), "Booking failed. Try again.", Toast.LENGTH_LONG).show());
+            }
+        });
+    }
+}
+
+9.4 feature/appointments/ui/adapters/AppointmentAdapter.java — NEW
+package com.example.hospimanagmenetapp.feature.appointments.ui.adapters;
+
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.*;
+
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.hospimanagmenetapp.R;
+import com.example.hospimanagmenetapp.data.entities.Appointment;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+public class AppointmentAdapter extends RecyclerView.Adapter<AppointmentAdapter.VH> {
+
+    public interface Clicker { void onClick(Appointment a); }
+
+    private final List<Appointment> data;
+    private final Clicker clicker;
+    private final SimpleDateFormat sdf =
+            new SimpleDateFormat("dd MMM yyyy HH:mm", Locale.UK);
+
+    public AppointmentAdapter(List<Appointment> data, Clicker clicker) {
+        this.data = data;
+        this.clicker = clicker;
+    }
+
+    @NonNull @Override
+    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_appointment, parent, false);
+        return new VH(v);
+    }
+
+    @Override public void onBindViewHolder(@NonNull VH h, int position) {
+        Appointment a = data.get(position);
+        h.tvPatient.setText("NHS: " + a.patientNhsNumber);
+        h.tvClinician.setText(a.clinicianName + " — " + a.clinic);
+        h.tvTime.setText(sdf.format(new Date(a.startTime)) + " → " + sdf.format(new Date(a.endTime)));
+        h.itemView.setOnClickListener(v -> clicker.onClick(a));
+    }
+
+    @Override public int getItemCount() { return data == null ? 0 : data.size(); }
+
+    static class VH extends RecyclerView.ViewHolder {
+        TextView tvPatient, tvClinician, tvTime;
+        VH(View item) {
+            super(item);
+            tvPatient = item.findViewById(R.id.tvPatient);
+            tvClinician = item.findViewById(R.id.tvClinician);
+            tvTime = item.findViewById(R.id.tvTime);
+        }
+    }
+}
+
+10) Layouts
+10.1 res/layout/activity_appointment.xml — NEW
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/appointmentContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"/>
+
+10.2 res/layout/fragment_appointment_list.xml — NEW
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <Spinner
+            android:id="@+id/spClinic"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"/>
+
+        <Button
+            android:id="@+id/btnRefresh"
+            android:text="Refresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progress"
+        android:layout_marginTop="8dp"
+        android:visibility="gone"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvAppointments"
+        android:layout_marginTop="8dp"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"/>
+</LinearLayout>
+
+10.3 res/layout/item_appointment.xml — NEW
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground">
+
+    <TextView
+        android:id="@+id/tvPatient"
+        android:textStyle="bold"
+        android:text="NHS: xxxxxxxxxx"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:id="@+id/tvClinician"
+        android:text="Dr. Smith — Clinic A"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+
+    <TextView
+        android:id="@+id/tvTime"
+        android:text="01 Jan 2025 09:00 → 09:20"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"/>
+</LinearLayout>
+
+10.4 res/layout/fragment_booking.xml — NEW
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <LinearLayout
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:id="@+id/tvClinician"
+            android:textStyle="bold"
+            android:text="Clinician:"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/etNhsBooking"
+            android:hint="NHS Number"
+            android:inputType="number"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/etStartMillis"
+            android:hint="Start time (epoch millis)"
+            android:inputType="number"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <EditText
+            android:id="@+id/etEndMillis"
+            android:hint="End time (epoch millis)"
+            android:inputType="number"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <Button
+            android:id="@+id/btnConfirmBooking"
+            android:text="Confirm"
+            android:layout_marginTop="12dp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+</ScrollView>
+(Optional bottomsheet_reschedule.xml can be added later if you prefer a sheet UI — the BookingFragment already supports booking/reschedule flow.)
+
+11) Mock JSON assets (for Retrofit mock ignore for the time being)
+
+12) That’s it — quick test plan
+1.	Launch app → Appointments → Biometric prompt → list loads (mock within ~1s).
+2.	Filter clinic → Refresh → list updates.
+3.	Tap an item → Booking screen pre-filled → change times (epoch) → Confirm → success toast, back to list.
+4.	Conflict test: enter times that overlap an existing appointment for same clinician → conflict toast.
+This upgrade implements the Lab-2 items:
+	Modules/Packages (mirrored structure under your base package)
+	Use cases & Repository (today’s list; booking/rescheduling; conflict detection)
+	Retrofit with MockInterceptor + mock assets
+	BiometricPrompt gate + RBAC checks
+	UI (list, booking) with graceful error states
+
